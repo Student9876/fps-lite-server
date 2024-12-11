@@ -1,46 +1,36 @@
-// // backend/index.js
-// const express = require("express");
-// const app = express();
-// const PORT = process.env.PORT || 5000;
-// const http = require("http");
-// const {Server} = require("socket.io");
-// const server = http.createServer(app);
-// const io = new Server(server);
-// const cors = require("cors");
-// app.use(cors());
-
-// app.use(express.json());
-
-// app.get("/api/game-data", (req, res) => {
-// 	res.json({message: "Game data here"});
-// });
-
-// const players = {};
-
-// // When a player connects
-
-// server.listen(3001, () => {
-// 	console.log("Server running on port 3001");
-// });
-
-// app.listen(PORT, () => {
-// 	console.log(`Server is running on http://localhost:${PORT}`);
-// });
-// server.js
 const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
 const app = express();
-app.use(cors());
+
+// Configure CORS for Express
+app.use(cors({
+	origin: process.env.ALLOWED_ORIGINS?.split(",") || [
+		"http://localhost:3000",
+		"https://fps-lite.vercel.app"
+	],
+	methods: ["GET", "POST"],
+	credentials: true
+}));
 
 const httpServer = createServer(app);
+
+// Configure CORS for Socket.IO
 const io = new Server(httpServer, {
 	cors: {
-		origin: process.env.ALLOWED_ORIGINS?.split(",") || ["http://localhost:3000"],
+		origin: process.env.ALLOWED_ORIGINS?.split(",") || [
+			"http://localhost:3000",
+			"https://fps-lite.vercel.app"
+		],
 		methods: ["GET", "POST"],
+		credentials: true,
+		allowedHeaders: ["Content-Type", "Authorization"],
+		transports: ['websocket', 'polling']
 	},
+	pingTimeout: 60000,
+	pingInterval: 25000
 });
 
 const players = new Map();
@@ -91,15 +81,16 @@ io.on("connection", (socket) => {
 			direction,
 		});
 	});
-	socket.on("playerHit", ({ shooterId, targetId }) => {
-		// Broadcast hit to all players in the room
-		io.emit("playerHit", { shooterId, targetId });
-	});
 
 	socket.on("disconnect", () => {
 		players.delete(playerId);
 		io.emit("playerLeft", playerId);
 	});
+});
+
+// Health check endpoint
+app.get("/", (req, res) => {
+	res.send("Server is running");
 });
 
 const PORT = process.env.PORT || 3001;
